@@ -5,7 +5,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-const map: Record<string, { count: number, windowStart: number }> = {};
+
+type Bucket = {
+    token: number;
+    lastRefillTime: number;
+}
+
+const map: Record<string, Bucket> = {};
+const CAPACITY = 10;
+const REFILL_RATE = 10 / 60; // tokens per second
 
 function rateLimiter(req: Request, res: Response, next: NextFunction) {
 
@@ -17,21 +25,24 @@ function rateLimiter(req: Request, res: Response, next: NextFunction) {
 
     // if ip in map then update otherwise add the ip in the map
     if (map[ip]) {
-        const {count, windowStart} = map[ip];
-        if (Date.now() - windowStart >= 60_000) {
-            map[ip] = {count: 1, windowStart: Date.now()};
-        } else {
-            if (count >= 10) {
-                return res.sendStatus(429);
-            } else {
-                map[ip].count++;
+        const bucket = map[ip];
+        // elapsed time in seconds
+        const elapsedTime = (Date.now() - bucket?.lastRefillTime) / 1_000;
 
-            }
+        // tokenEarned calculation
+        const refillToken: number = Math.min((bucket?.token + (elapsedTime * (REFILL_RATE))), CAPACITY);
+
+        if (refillToken >= 1) {
+            map[ip] = {token: refillToken - 1, lastRefillTime: Date.now()};
+
+
+        } else {
+            return res.sendStatus(429);
         }
         return next()
 
     } else {
-        map[ip] = {count: 1, windowStart: Date.now()};
+        map[ip] = {token: CAPACITY - 1, lastRefillTime: Date.now()};
         return next();
     }
 
