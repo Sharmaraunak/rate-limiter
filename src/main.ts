@@ -1,4 +1,5 @@
 import express, {type NextFunction, type Request, type Response} from "express";
+import {connectRedis} from "../redis.js";
 
 const app = express();
 
@@ -22,6 +23,8 @@ function rateLimiter(req: Request, res: Response, next: NextFunction) {
 
     // logging for the testing purpose
     console.log(ip, map);
+
+
 
     // if ip in map then update otherwise add the ip in the map
     if (map[ip]) {
@@ -54,4 +57,11 @@ app.get("/api/data", rateLimiter, (req, res) => {
     })
 })
 
-app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+async function startApp() {
+    console.log(process.env.REDIS_URL);
+    await connectRedis();
+    app.listen(PORT, () => console.log(`Listening on ${PORT}`));
+}
+
+startApp();
+
